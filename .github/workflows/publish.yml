@@ -1,0 +1,82 @@
+# Publish dsh-tailscale to npm, on demand.
+#
+# `workflow_dispatch` only, and the publish is gated on package.json's
+# `version` being absent from the registry: bump the version, run the workflow,
+# and the package goes out; leave it alone and the run is a no-op. That gate is
+# what keeps "every release bumps the version" honest — forget the bump and
+# nothing ships, which is visible, rather than a version silently being skipped.
+#
+# Authentication is npm **Trusted Publishing** (OIDC): there is no NPM_TOKEN
+# secret anywhere. GitHub mints a short-lived OIDC token for this job, and npm
+# exchanges it for a publish token scoped to this one package. `id-token: write`
+# is what makes that mint possible; without it npm silently falls back to
+# "no credentials" and the publish fails with ENEEDAUTH.
+#
+# The registry is NOT passed via actions/setup-node's `registry-url`. That input
+# writes `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into ~/.npmrc, and
+# with no NODE_AUTH_TOKEN defined the placeholder survives as a literal string
+# that npm would send as the token. package.json's `publishConfig.registry`
+# already names the registry, so npm resolves it without any .npmrc at all.
+#
+# Requires a one-time setup on npmjs.com, once per package (Settings -> Trusted
+# Publisher): repository agostino-code/dsh-tailscale, workflow `publish.yml`,
+# environment blank. The workflow filename must match exactly, because npm ties
+# the grant to it. Until that grant exists the workflow fails at the publish
+# step; that is expected, and it is why this is manual-only rather than
+# triggered by every push.
+name: Publish
+
+on:
+  workflow_dispatch:
+
+# Serialize runs so two pushes cannot race the same version. Queued, not
+# cancelled: an in-flight publish must be allowed to finish.
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      # Trusted Publishing is a feature of the npm CLI, not of Node: the OIDC
+      # token exchange lives in npm's own lib/utils/oidc.js, which exists in
+      # npm 11.5.1+ and NOT in the npm 10.x that Node 22 ships. On npm 10 the
+      # exchange never happens, npm falls through to "no credentials", and the
+      # publish dies with ENEEDAUTH -- which reads like a missing token but is
+      # really an npm too old to speak OIDC. Pin the floor explicitly.
+      - name: Ensure an npm that supports Trusted Publishing
+        run: |
+          npm install -g npm@^11.5.1
+          npm --version
+
+      - name: Test
+        run: npm test
+
+      # `npm view <name>@<version>` exits non-zero when the version is absent,
+      # which is exactly the "not released yet" case. npm publish would refuse a
+      # duplicate anyway; this gate turns that hard failure into a quiet skip so
+      # an unrelated push does not show up as a red run.
+      - name: Publish unless this version is already on the registry
+        run: |
+          set -euo pipefail
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if npm view "${name}@${version}" version >/dev/null 2>&1; then
+            echo "::notice::${name}@${version} is already published - nothing to do."
+            echo "Bump \"version\" in package.json to release a change."
+            exit 0
+          fi
+          echo "::notice::publishing ${name}@${version}"
+          npm publish

@@ -1,0 +1,26 @@
+# Run the test suite on every push and pull request.
+#
+# The plugin ships without runtime dependencies, so there is nothing to install:
+# checkout, set up Node, run `npm test`. That keeps CI fast and means a green run
+# here is exactly what a user gets from `npm test` in a fresh checkout.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+
+      - name: Test
+        run: npm test

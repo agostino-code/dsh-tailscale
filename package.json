@@ -1,0 +1,63 @@
+{
+  "name": "dsh-tailscale",
+  "version": "0.7.0",
+  "type": "module",
+  "description": "DSH plugin that publishes the DeepSeek Harness Web GUI on your Tailscale tailnet via Tailscale Serve, with a persistent phone login link, one-click key rotation, and automatic teardown when DSH exits.",
+  "license": "MIT",
+  "author": "Ckarefulon",
+  "contributors": [
+    "Agostino Cesarano"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/agostino-code/dsh-tailscale.git"
+  },
+  "homepage": "https://github.com/agostino-code/dsh-tailscale#readme",
+  "bugs": {
+    "url": "https://github.com/agostino-code/dsh-tailscale/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "tailscale",
+    "tailnet",
+    "serve",
+    "remote",
+    "mobile",
+    "phone",
+    "remote-access"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client/client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "index.js",
+    "client/client.js",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "locale/*.json"
+  ],
+  "scripts": {
+    "test": "node --test test/classify.test.mjs test/teardown.test.mjs test/routes.test.mjs test/client.test.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
